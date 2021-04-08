@@ -1,5 +1,5 @@
 FROM java
-COPY target/*.jar /tmp
+ADD ./target/demoproject-0.0.1-SNAPSHOT.jar /demoproject-0.0.1-SNAPSHOT.jar
 EXPOSE 18999
-ENTRYPOINT ["sh", "-c", "java -jar /tmp/*.jar"]
+ENTRYPOINT ["sh", "-c", "java -jar /demoproject-0.0.1-SNAPSHOT.jar"]
 
