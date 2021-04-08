@@ -10,7 +10,7 @@ def call(Map args) {
 	"""
 	app = docker.build("${args.remote}/${args.project}/${args.imageName}:${args.tag}", "${args.otherargs} --file ${args.filePath} ${args.contextPath}")
 	echo "Image tagged"
-	docker.withRegistry("${GCR_URL}", "gcr:${GOOGLE_PROJECT_CRED_ID}") {
+	docker.withRegistry("https://${GCR_URL}", "gcr:${GOOGLE_PROJECT_CRED_ID}") {
 		app.push()
 		app.push("latest")
 	}
