@@ -10,6 +10,6 @@ def call(Map args) {
 		app.push()
 		app.push("latest")
 	}
-	docker rmi ${args.remote}/${args.project}/${args.imageName}:${args.tag}
+	docker rmi "${args.remote}/${args.project}/${args.imageName}:${args.tag}"
 	//echo "Finished creation of docker images and pushed to GCR" 
 }
