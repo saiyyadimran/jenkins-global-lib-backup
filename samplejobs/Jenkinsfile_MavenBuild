@@ -1,0 +1,41 @@
+@Library('global-shared-pipeline-lib')_
+
+try {
+podTemplate(containers: [
+    containerTemplate(name: 'maven', image: 'maven:3.3.9-jdk-8-alpine', ttyEnabled: true, command: 'cat')
+  ]) {
+
+    node(POD_LABEL) {
+        stage('Get a Maven project') {
+            container('maven') {
+                stage('stage 2') {
+                    gitCheckout(
+						branch: "master",
+						url: env.SHARED_LIB_GITHUB_URL,
+						credentialsId: "Git-Jenkins-Credentials"
+                        )
+					}
+                stage('stage 3') {
+                    sh """
+                    mvn -v
+                    pwd
+					ls -ltr
+					cd samplemavenproject
+					ls -ltr
+					pwd
+					pwd > /tmp/filepath.txt
+                    """
+                    mvnCleanInstallWithoutProfile(
+					skipTest: true
+					)
+                }
+            }
+        }
+    }
+  }
+}			   
+}catch (e) {
+    // If there was an exception thrown, the build failed
+    currentBuild.result = "FAILED"
+    throw e
+}

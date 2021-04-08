@@ -1,0 +1,48 @@
+@Library('global-shared-pipeline-lib')_
+
+try {
+	podTemplate(containers: [
+		containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true),
+				],
+				volumes: [
+					hostPathVolume(hostPath: '/var/run/docker.sock', mountPath: '/var/run/docker.sock'),
+				],
+
+	  ) {
+
+		node(POD_LABEL) {
+			stage('Check code') {
+				container('docker') {
+					stage('Checkout code') {
+						gitCheckout(
+							branch: "master",
+							url: env.SHARED_LIB_GITHUB_URL,
+							credentialsId: "Git-Jenkins-Credentials"
+						)
+					}
+					stage('Deploy-Artifacts') {
+					    sh """
+					    apk add curl
+					    apk add gettext
+						curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.7.0/bin/linux/amd64/kubectl
+						chmod +x ./kubectl
+						mv ./kubectl /usr/local/bin/kubectl
+						pwd
+						printenv
+						envsubst < k8s/deployment.yaml
+						kubectl -n devops apply -f k8s/python/deployment.yaml --validate=false
+						"""
+                        
+            }
+
+				}
+			}
+			
+
+		}
+	}		   
+} catch (e) {
+    // If there was an exception thrown, the build failed
+    currentBuild.result = "FAILED"
+    throw e
+} 

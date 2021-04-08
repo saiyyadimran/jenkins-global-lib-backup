@@ -1,0 +1,77 @@
+@Library('global-shared-pipeline-lib')_
+env springbootimagePath = "${GCR_URL}/${GOOGLE_PROJECT_CRED_ID}/springboot:${env.BUILD_NUMBER}"
+try {
+	podTemplate(containers: [
+		containerTemplate(name: 'maven', image: 'maven:3.3.9-jdk-8-alpine', ttyEnabled: true, command: 'cat'),
+		containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true),
+		],
+		volumes: [
+			hostPathVolume(hostPath: '/var/run/docker.sock', mountPath: '/var/run/docker.sock')
+	]) {
+		node(POD_LABEL) {
+			stage('Build') {
+				container('maven') {
+					stage('Checkout code') {
+					   gitCheckout(
+							branch: "master",
+							url: env.SHARED_LIB_GITHUB_URL,
+							credentialsId: "Git-Jenkins-Credentials"
+							)
+					}
+					stage(Compile wihtout tests) {
+						sh """
+							cd build/springboot
+							pwd > /tmp/filepath.txt
+						"""
+						mvnCleanInstallWithoutProfile(
+							skipTest: true
+						)
+					}
+					script {
+						withCredentials([file(credentialsId: 'sonar-nexus', variable: 'MAVEN_SETTING')]) {
+							sh '''
+								cd build/springboot
+								cat $MAVEN_SETTING > setting.xml
+								cat setting.xml
+							'''
+						}
+					}
+					sh "echo sonar analysis here"
+					withSonarQubeEnv('SonarQube') {
+						sh '''
+							cd build/springboot
+							mvn --settings setting.xml clean verify sonar:sonar
+						'''
+					}
+				}
+				container('docker') {
+					stage(Build docker image) {
+						buildAndPushDockerImage(
+							remote: env.GCR_URL,
+							project: env.GOOGLE_PROJECT_CRED_ID,
+							imageName: "springboot",
+							tag: ${BUILD_NUMBER},
+							otherargs: "--no-cache=true --force-rm",
+							filePath: "$WORKSPACE/build/springboot/Dockerfile"
+						)
+					}
+					stage('Deploy-Artifacts') {
+					    sh """
+							apk add curl
+							apk add gettext
+							curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.7.0/bin/linux/amd64/kubectl
+							chmod +x ./kubectl
+							mv ./kubectl /usr/local/bin/kubectl
+							pwd
+							printenv
+							cat k8s/springboot/deployment.yaml | envsubst | kubectl -n devops apply -f -
+						"""
+					}
+				}
+			}
+		}
+	}
+} catch (e) {
+    currentBuild.result = "FAILED"
+    throw e
+}

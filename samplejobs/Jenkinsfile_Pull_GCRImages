@@ -1,0 +1,40 @@
+@Library('global-shared-pipeline-lib')_
+
+try {
+	podTemplate(containers: [
+		containerTemplate(name: 'sdk', image: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest', ttyEnabled: true, command: 'cat')
+				],
+		) {
+
+		node(POD_LABEL) {
+			stage('Check code') {
+				container('sdk') {
+					stage('Checkout code') {
+						gitCheckout(
+							branch: "master",
+							url: env.SHARED_LIB_GITHUB_URL,
+							credentialsId: "Git-Jenkins-Credentials"
+						)
+					}
+					stage('Build and push docker image') {
+					    withCredentials([file(credentialsId: 'gcp_keys', variable: 'GC_KEY')])  {
+                            script {
+                          
+                            sh 'gcloud auth list'
+                            sh 'gcloud auth activate-service-account --key-file=$GC_KEY'
+                            sh 'gcloud container images list-tags us.gcr.io/devops-307515/python'
+					}
+					
+				  }
+				}
+			}
+		}	
+
+		}
+	  }
+			   
+} catch (e) {
+    // If there was an exception thrown, the build failed
+    currentBuild.result = "FAILED"
+    throw e
+} 

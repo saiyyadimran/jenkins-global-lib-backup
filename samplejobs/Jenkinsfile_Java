@@ -1,0 +1,53 @@
+@Library('global-shared-pipeline-lib')_
+
+try {
+podTemplate(containers: [
+    containerTemplate(name: 'java', image: 'openjdk:17-ea-10-jdk', ttyEnabled: true, command: 'cat'),
+    containerTemplate(name: 'maven', image: 'maven:3.3.9-jdk-8-alpine', ttyEnabled: true, command: 'cat')
+    ]) {
+    node(POD_LABEL) {
+        stage('Get a Java project') {
+            git 'https://github.com/jenkinsci/kubernetes-plugin.git'
+            container('java') {
+                stage('Check java version') {
+                    sh 'java -version'
+                }
+            }
+        }
+        stage('sonar analysis') {
+            container('maven') {
+                stage('Checkout code') {
+                   gitCheckout(
+						branch: "master",
+						url: env.SHARED_LIB_GITHUB_URL,
+						credentialsId: "Git-Jenkins-Credentials"
+                        )
+                }
+			script {
+				withCredentials([file(credentialsId: 'sonar-nexus', variable: 'MAVEN_SETTING')]) {
+							sh '''
+                              echo "Iam inside withcredentails"
+                              cd samplemavenproject
+                              pwd
+							  cat $MAVEN_SETTING >setting.xml
+							  cat setting.xml
+							'''
+						  }
+				}
+                sh "echo sonar analysis here"
+				withSonarQubeEnv('SonarQube') {
+				    sh '''
+				        cd samplemavenproject
+				       mvn --settings setting.xml clean verify sonar:sonar
+				'''
+				}
+			}
+        }
+    }   
+    
+}
+}catch (e) {
+    // If there was an exception thrown, the build failed
+    currentBuild.result = "FAILED"
+    throw e
+}
